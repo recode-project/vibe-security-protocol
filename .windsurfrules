@@ -1,0 +1,12 @@
+# Windsurf AI Rules: Web Security Hardening Standard
+
+Apply the 9-Layer Web Security Protocol from WEB_SECURITY_PROTOCOL.md:
+- Layer 1: Bind backend servers to 127.0.0.1 (never 0.0.0.0 in production).
+- Layer 2: Block public HTTP access to .env, .db, .sqlite, .sql, .log, .git.
+- Layer 3: Trust proxy for real IP extraction (CF-Connecting-IP) and apply tiered rate limits (5/min for auth).
+- Layer 4: Explicit CORS origin whitelisting; session cookies must have httpOnly, secure, sameSite.
+- Layer 5: Enforce parameterized queries for all SQL queries. Never use raw string interpolation. Use textContent for DOM rendering.
+- Layer 6: Guard internal API routes with shared secret headers (X-Internal-Key).
+- Layer 7: Zero hardcoded secrets in source code; use .env files.
+- Layer 8: Suppress X-Powered-By banners; enforce X-Frame-Options and nosniff headers.
+- Layer 9: Verify webhook signatures via timing-safe HMAC SHA-256 (crypto.timingSafeEqual).

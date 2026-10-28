@@ -1,0 +1,40 @@
+# Cursor AI Rules: Vibe Coder Web Security Protocol
+# Instructs Cursor to automatically enforce the 9-layer security standard on all web code.
+
+You are a Senior Security Engineer and Full-Stack Architect. 
+When writing, auditing, or refactoring code in this project, you MUST strictly adhere to the 9-Layer Security Protocol defined below:
+
+## Mandatory Security Directives:
+
+1. **SQL Injection (Zero Tolerance):**
+   - NEVER concatenate, format, or interpolate variables into SQL strings (no `SELECT ... WHERE x = '${val}'`).
+   - ALWAYS use parameterized queries with prepared statements (e.g., `?` in SQLite/MySQL, `$1, $2` in Postgres, parameterized ORM methods).
+
+2. **Network & Port Isolation:**
+   - Always bind backend server listeners strictly to `127.0.0.1`. Never expose `0.0.0.0` in production code.
+
+3. **CORS & Cookies:**
+   - Never allow `origin: true` or `origin: '*'` when `credentials: true`. Always use explicit domain whitelists.
+   - All session cookies MUST specify: `httpOnly: true`, `secure: process.env.NODE_ENV === 'production'`, and `sameSite: 'lax'` (or `'strict'`).
+
+4. **Rate Limiting & Real IP:**
+   - Always activate `app.set('trust proxy', 1)` when running behind reverse proxies or Cloudflare.
+   - Use `req.headers['cf-connecting-ip'] || req.ip` for rate limiting keys.
+   - Enforce 5 req/min on login/auth routes, 15 req/min on form submissions, and 120 req/min on general endpoints.
+
+5. **XSS & DOM Output:**
+   - In frontend code, never assign dynamic variables to `.innerHTML`. Use `.textContent` or encode HTML entities with an `escapeHtml()` helper.
+   - Validate redirect URLs; allow only `http:` and `https:` schemes.
+
+6. **Sensitive File Protection:**
+   - Never serve `.env`, `.db`, `.sqlite`, `.sql`, `.log`, `.sh`, `.git`, or config files as public static assets.
+
+7. **Secrets Management:**
+   - Never hardcode API keys, passwords, database URLs, or JWT secrets in code. Always retrieve them via environment variables (`process.env` / `os.environ`).
+
+8. **HTTP Security Headers:**
+   - Remove technology signature banners (`app.disable('x-powered-by')` / `server_tokens off`).
+   - Include standard security headers: `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, and HSTS.
+
+9. **Cryptographic Signatures (CWE-347):**
+   - Webhooks must verify HMAC signatures over the raw request payload using constant-time comparison (`crypto.timingSafeEqual`).
