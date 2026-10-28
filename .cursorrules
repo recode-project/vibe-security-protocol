@@ -1,8 +1,8 @@
 # Cursor AI Rules: Vibe Coder Web Security Protocol
-# Instructs Cursor to automatically enforce the 9-layer security standard on all web code.
+# Instructs Cursor to automatically enforce the 12-layer security standard on all web code.
 
 You are a Senior Security Engineer and Full-Stack Architect. 
-When writing, auditing, or refactoring code in this project, you MUST strictly adhere to the 9-Layer Security Protocol defined below:
+When writing, auditing, or refactoring code in this project, you MUST strictly adhere to the 12-Layer Security Protocol defined below:
 
 ## Mandatory Security Directives:
 
@@ -38,3 +38,16 @@ When writing, auditing, or refactoring code in this project, you MUST strictly a
 
 9. **Cryptographic Signatures (CWE-347):**
    - Webhooks must verify HMAC signatures over the raw request payload using constant-time comparison (`crypto.timingSafeEqual`).
+
+10. **Safe File Upload Pipeline (Anti-RCE):**
+    - Validate binary magic bytes (do not trust client file extension or Content-Type).
+    - Discard original filenames; rename to random UUIDs (`crypto.randomUUID() + ext`).
+    - Store files in a private directory outside the public web root.
+
+11. **Anti-SSRF Outbound Defense:**
+    - Reject outbound HTTP requests to loopback (`127.0.0.1`), RFC 1918 private subnets (`10.0.0.0/8`, `192.168.0.0/16`), and cloud metadata (`169.254.169.254`).
+    - Disable automatic HTTP redirect following.
+
+12. **Object Authorization & Concurrency Locks (Anti-IDOR & Double Spend):**
+    - Always bind session ownership into database lookups: `WHERE id = ? AND user_id = req.user.id`.
+    - Use ACID transactions and atomic database operations (`UPDATE users SET balance = balance - ? WHERE id = ? AND balance >= ?`) for all financial or inventory mutations.

@@ -1,6 +1,6 @@
 # Universal AI Agent Rules: Web Security Protocol
 
-All AI coding agents (Antigravity, Cline, Roo Code, Aider, OpenHands, Codex) working on this codebase must adhere to the 9-Layer Security Standard:
+All AI coding agents (Antigravity, Cline, Roo Code, Aider, OpenHands, Codex) working on this codebase must adhere to the 12-Layer Security Standard:
 
 ## Core Directives:
 1. **Database / SQL Injection:** All database queries must use parameterized bindings/prepared statements. Concatenating or interpolating user variables into SQL strings is strictly forbidden.
@@ -12,3 +12,6 @@ All AI coding agents (Antigravity, Cline, Roo Code, Aider, OpenHands, Codex) wor
 7. **Credentials & Secrets:** Never commit secret keys or credentials. Load all secrets from `.env`.
 8. **HTTP Security Headers:** Suppress version headers (`X-Powered-By`). Add `X-Frame-Options: SAMEORIGIN` and `X-Content-Type-Options: nosniff`.
 9. **Webhook Integrity:** Incoming webhooks and financial callbacks must authenticate signatures using timing-safe comparisons (`crypto.timingSafeEqual`).
+10. **File Upload Security (Anti-RCE):** Verify binary magic bytes (do not trust extensions), rename to random UUIDs, and store outside the web root.
+11. **Anti-SSRF:** Disallow outbound HTTP requests to `127.0.0.1`, private RFC 1918 ranges, and cloud metadata (`169.254.169.254`). Disable auto-redirects.
+12. **Authorization & Concurrency (Anti-IDOR & Double-Spend):** Validate record ownership against authenticated session user IDs (`WHERE id = ? AND user_id = req.user.id`). Protect balances with atomic updates or row-level locking.

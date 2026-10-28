@@ -1,6 +1,6 @@
 # Claude Code Security Directives
 
-When modifying, generating, or reviewing web applications in this repository, you must enforce the **9-Layer Web Security Protocol** (`WEB_SECURITY_PROTOCOL.md`):
+When modifying, generating, or reviewing web applications in this repository, you must enforce the **12-Layer Web Security Protocol** (`WEB_SECURITY_PROTOCOL.md`):
 
 1. **SQL Injection Prevention:**
    - Enforce parameterized queries / prepared statements for every database operation (PostgreSQL, SQLite, MySQL).
@@ -32,3 +32,14 @@ When modifying, generating, or reviewing web applications in this repository, yo
 
 9. **Cryptographic Webhook Verification:**
    - Verify webhook signatures using timing-safe comparisons (`crypto.timingSafeEqual`) to prevent CWE-347 and timing attacks.
+
+10. **Safe File Upload Pipeline (Anti-RCE):**
+    - Validate binary magic bytes; discard original filenames and rename to cryptographically random UUIDs.
+    - Store files in private directories outside public document roots.
+
+11. **Anti-SSRF Defense:**
+    - Block outbound requests to `127.0.0.1`, RFC 1918 private subnets (`10.0.0.0/8`, `192.168.0.0/16`), and cloud metadata (`169.254.169.254`). Disable auto-redirects.
+
+12. **Object Authorization & Atomic Concurrency (Anti-IDOR & Race Conditions):**
+    - Enforce object-level user ownership checks: `WHERE id = ? AND user_id = req.user.id`.
+    - Prevent race conditions on balance/inventory using atomic conditional updates or ACID row-level locking.

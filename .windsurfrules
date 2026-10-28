@@ -1,6 +1,6 @@
 # Windsurf AI Rules: Web Security Hardening Standard
 
-Apply the 9-Layer Web Security Protocol from WEB_SECURITY_PROTOCOL.md:
+Apply the 12-Layer Web Security Protocol from WEB_SECURITY_PROTOCOL.md:
 - Layer 1: Bind backend servers to 127.0.0.1 (never 0.0.0.0 in production).
 - Layer 2: Block public HTTP access to .env, .db, .sqlite, .sql, .log, .git.
 - Layer 3: Trust proxy for real IP extraction (CF-Connecting-IP) and apply tiered rate limits (5/min for auth).
@@ -10,3 +10,6 @@ Apply the 9-Layer Web Security Protocol from WEB_SECURITY_PROTOCOL.md:
 - Layer 7: Zero hardcoded secrets in source code; use .env files.
 - Layer 8: Suppress X-Powered-By banners; enforce X-Frame-Options and nosniff headers.
 - Layer 9: Verify webhook signatures via timing-safe HMAC SHA-256 (crypto.timingSafeEqual).
+- Layer 10: Enforce safe file uploads via magic bytes, UUID renames, and private directory storage (Anti-RCE).
+- Layer 11: Block SSRF on outbound HTTP clients (reject loopback, private RFC 1918 IPs, and 169.254.169.254 metadata).
+- Layer 12: Enforce object-level user ownership checks (Anti-IDOR) and atomic database operations for concurrency safety.

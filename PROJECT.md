@@ -2,7 +2,7 @@
 project_name: "vibe-security-protocol"
 author: "Tuan Eka Harefa"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 last_updated: "2026-10-28"
 path: "/mnt/New_Volume/tool untuk github"
 ---
@@ -12,7 +12,7 @@ path: "/mnt/New_Volume/tool untuk github"
 ## 1. Tujuan Proyek
 Proyek ini dirancang sebagai paket aturan dan standar pengerasan keamanan (*production hardening rulepack*) siap pakai untuk kalangan **"vibe coder"**—pengembang web yang menggunakan AI assistant (Cursor, Claude Code, Windsurf, Copilot, Cline, Antigravity, dll.). 
 
-AI sering menghasilkan kode yang berfungsi cepat namun mengabaikan pertahanan mendalam (*defense-in-depth*), seperti rentan SQL injection, CORS wildcard, cookie sesi terekspos, port publik terbuka, file `.env` bocor, rate limiting absen, dan callback finansial tanpa validasi tanda tangan HMAC. Repositori ini menyediakan berkas aturan universal dan one-liner installer sehingga pengguna cukup menyalin aturan ini dan memerintahkan AI coder mereka untuk mengeksekusi audit serta perbaikan secara otomatis.
+AI sering menghasilkan kode yang berfungsi cepat namun mengabaikan pertahanan mendalam (*defense-in-depth*), seperti rentan SQL injection, CORS wildcard, cookie sesi terekspos, port publik terbuka, file `.env` bocor, rate limiting absen, callback finansial tanpa validasi tanda tangan HMAC, file upload RCE, SSRF, IDOR, dan race conditions. Repositori ini menyediakan berkas aturan universal dan one-liner installer sehingga pengguna cukup menyalin aturan ini dan memerintahkan AI coder mereka untuk mengeksekusi audit serta perbaikan secara otomatis.
 
 ## 2. Struktur Berkas & Komponen
 ```
@@ -28,10 +28,10 @@ AI sering menghasilkan kode yang berfungsi cepat namun mengabaikan pertahanan me
 ├── LICENSE                       # Lisensi MIT
 ├── PROJECT.md                    # Dokumentasi multi-agent ini
 ├── README.md                     # Dokumentasi utama publik untuk GitHub (tata cara pakai, prompt, checklist)
-└── WEB_SECURITY_PROTOCOL.md      # Spesifikasi master 9-lapisan proteksi web lengkap
+└── WEB_SECURITY_PROTOCOL.md      # Spesifikasi master 12-lapisan proteksi web lengkap
 ```
 
-## 3. Cakupan 9 Lapisan Keamanan
+## 3. Cakupan 12 Lapisan Keamanan
 1. **Layer 1: Network & Port Binding** — Backend hanya listen di `127.0.0.1` (isolasi dari port scanning publik).
 2. **Layer 2: Sensitive Files Shielding** — Blokir HTTP ke `.env`, `.db`, `.sqlite`, `.sql`, `.log`, `.git`, `.sh`, `.bak`.
 3. **Layer 3: Real IP & Rate Limiting** — Pembacaan IP di balik reverse proxy (`CF-Connecting-IP`) dan kuota limit bertingkat.
@@ -41,6 +41,9 @@ AI sering menghasilkan kode yang berfungsi cepat namun mengabaikan pertahanan me
 7. **Layer 7: Secrets Isolation** — Kredensial murni via `.env` / environment variable dengan `chmod 600`.
 8. **Layer 8: Security Headers** — Penekanan banner `X-Powered-By` dan penegakan header `X-Frame-Options`, `nosniff`, `HSTS`.
 9. **Layer 9: Cryptographic Verification** — Validasi HMAC timing-safe (`timingSafeEqual`) untuk webhook/callback finansial (CWE-347).
+10. **Layer 10: Safe File Upload Pipeline** — Validasi binary magic bytes, UUID rename acak, dan isolasi direktori privat di luar web root (Anti-RCE).
+11. **Layer 11: Outbound Request & Anti-SSRF** — Pemblokiran request keluar ke loopback `127.0.0.1`, subnet privat RFC 1918, dan cloud metadata `169.254.169.254`.
+12. **Layer 12: Object-Level Authorization & Concurrency Locks** — Verifikasi kepemilikan user eksplisit (Anti-IDOR) dan transaksi ACID dengan operasi database atomik untuk mencegah Race Conditions.
 
 ## 4. Cara Penggunaan untuk AI Agent Lain
 Jika AI Agent lain membuka repositori ini untuk melanjutkan pengembangan atau integrasi:

@@ -1,29 +1,32 @@
 # VIBE CODER WEB SECURITY PROTOCOL
-### 9-Layer Production Hardening Standard for AI-Generated Code
+### 12-Layer Production Hardening Standard for AI-Generated Code
 
-> **For Vibe Coders & AI Agents:** AI builds fast, but frequently omits defense-in-depth measures—leaving database queries vulnerable to SQL injection, CORS wide open (`*`), cookies exposed to JavaScript, and internal ports accessible to the public. 
+> **For Vibe Coders & AI Agents:** AI builds fast, but frequently omits defense-in-depth measures—leaving database queries vulnerable to SQL injection, CORS wide open (`*`), cookies exposed to JavaScript, internal ports accessible, file upload RCE, and SSRF loopholes. 
 > 
 > **How to use with AI:** Drop this file into your repository and instruct your AI coding agent (Cursor, Claude Code, Windsurf, Copilot, Cline, Antigravity, etc.):
-> *"Audit this entire codebase and apply the 9 Hardening Layers from WEB_SECURITY_PROTOCOL.md. Fix all SQL injection vulnerabilities, secure CORS and cookies, add rate limiting, block sensitive file access, and eliminate hardcoded secrets."*
+> *"Audit this entire codebase and apply the 12 Hardening Layers from WEB_SECURITY_PROTOCOL.md. Fix all SQL injection vulnerabilities, secure CORS and cookies, add rate limiting, block sensitive files, prevent file upload RCE, block SSRF, eliminate IDOR with object authorization, and prevent race conditions."*
 
 ---
 
-## The 9 Hardening Layers
+## The 12 Hardening Layers
 
 ```
   +--------------------------------------------------------------+
   |                   INTERNET / REVERSE PROXY                   |
   +--------------------------------------------------------------+
                                  |
-  [ LAYER 1 ] Network Isolation  --> Bind strictly to 127.0.0.1, UFW lockdown
-  [ LAYER 2 ] Sensitive Files    --> Block .env, .db, .sqlite, .git, .sh, .bak
-  [ LAYER 3 ] Rate Limiting      --> Real IP extraction (CF-Connecting-IP) & quotas
-  [ LAYER 4 ] CORS & Cookies     --> Explicit origin whitelist, httpOnly + sameSite
-  [ LAYER 5 ] SQLi & XSS Defense --> Parameterized queries, textContent/escapeHtml
-  [ LAYER 6 ] Internal API Guard --> Shared secret (X-Internal-Key) for private routes
-  [ LAYER 7 ] Secrets Isolation  --> Zero hardcoded keys, environment vars (chmod 600)
-  [ LAYER 8 ] Security Headers   --> Helmet, server_tokens off, nosniff, frameguard
-  [ LAYER 9 ] Cryptographic Sig  --> HMAC-SHA256 timing-safe comparison (CWE-347)
+  [ LAYER 1  ] Network Isolation   --> Bind strictly to 127.0.0.1, UFW lockdown
+  [ LAYER 2  ] Sensitive Files     --> Block .env, .db, .sqlite, .git, .sh, .bak
+  [ LAYER 3  ] Rate Limiting       --> Real IP extraction (CF-Connecting-IP) & quotas
+  [ LAYER 4  ] CORS & Cookies      --> Explicit origin whitelist, httpOnly + sameSite
+  [ LAYER 5  ] SQLi & XSS Defense  --> Parameterized queries, textContent/escapeHtml
+  [ LAYER 6  ] Internal API Guard  --> Shared secret (X-Internal-Key) for private routes
+  [ LAYER 7  ] Secrets Isolation   --> Zero hardcoded keys, environment vars (chmod 600)
+  [ LAYER 8  ] Security Headers    --> Helmet, server_tokens off, nosniff, frameguard
+  [ LAYER 9  ] Cryptographic Sig   --> HMAC-SHA256 timing-safe comparison (CWE-347)
+  [ LAYER 10 ] Safe File Upload    --> Magic bytes check, UUID renames, storage outside root
+  [ LAYER 11 ] Anti-SSRF Defense   --> Private IP / metadata blocking, disable auto-redirect
+  [ LAYER 12 ] IDOR & Concurrency  --> Explicit ownership check & ACID atomic row-locks
                                  |
   +--------------------------------------------------------------+
   |                    PROTECTED BACKEND & DB                    |
@@ -379,9 +382,148 @@
 
 ---
 
+### LAYER 10: Safe File Upload Pipeline & Storage Isolation (Anti-RCE)
+
+**Rule:** Never trust user-supplied filenames, file extensions, or client-provided `Content-Type` headers. Prevent remote code execution (RCE) by validating binary signatures, generating random UUID names, and storing files outside the web document root.
+
+- **Vulnerabilities Prevented:** Web shell upload (`.php`, `.phtml`, `.jsp`, `.sh`), double extensions (`shell.php.jpg`), null-byte truncation, and SVG-based XSS.
+- **Node.js (Multer + File-Type Magic Bytes):**
+  ```javascript
+  const multer = require('multer');
+  const path = require('path');
+  const crypto = require('crypto');
+  const { fileTypeFromBuffer } = require('file-type');
+
+  // 1. Store uploads in a private directory OUTSIDE the public document root
+  const storage = multer.memoryStorage();
+  const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+  });
+
+  const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
+  app.post('/api/upload', upload.single('attachment'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    // 2. Inspect real binary magic bytes (not client Content-Type)
+    const detectedType = await fileTypeFromBuffer(req.file.buffer);
+    if (!detectedType || !ALLOWED_MIMES.includes(detectedType.mime)) {
+      return res.status(400).json({ error: 'Invalid file format: executable or spoofed file detected' });
+    }
+
+    // 3. Rename completely to random UUID + safe extension
+    const safeFilename = `${crypto.randomUUID()}.${detectedType.ext}`;
+    const destination = path.join(__dirname, '../private_uploads', safeFilename);
+
+    await fs.promises.writeFile(destination, req.file.buffer);
+    res.json({ success: true, fileId: safeFilename });
+  });
+  ```
+- **Nginx Protection for Upload Folders:**
+  ```nginx
+  # Ensure no scripts can ever be executed inside upload folders
+  location /uploads/ {
+      location ~ \.(php|phtml|sh|py|pl|cgi)$ {
+          deny all;
+          return 403;
+      }
+      add_header X-Content-Type-Options "nosniff" always;
+  }
+  ```
+
+---
+
+### LAYER 11: Outbound Request & Anti-SSRF Defense (Anti-SSRF)
+
+**Rule:** When application features fetch external URLs (webhooks, avatar imports, PDF generators, link previews), enforce strict IP destination validation. Disallow requests to internal localhost, private networks, and cloud instance metadata endpoints.
+
+- **Vulnerabilities Prevented:** Server-Side Request Forgery (SSRF), internal port scanning, AWS/GCP/Azure metadata theft (`169.254.169.254`).
+- **IP Blacklist Range:**
+  - Loopback: `127.0.0.0/8`, `localhost`, `::1`
+  - Cloud Instance Metadata: `169.254.169.254`
+  - RFC 1918 Private Ranges: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
+  - IPv6 Special: `fc00::/7`, `fe80::/10`
+- **Node.js (Axios / Fetch Safe Wrapper):**
+  ```javascript
+  const dns = require('dns').promises;
+  const ipaddr = require('ipaddr.js');
+  const axios = require('axios');
+
+  async function safeFetchExternal(targetUrl) {
+    const parsed = new URL(targetUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Disallowed protocol');
+    }
+
+    // Resolve DNS to actual IP before connecting
+    const { address } = await dns.lookup(parsed.hostname);
+    const parsedIp = ipaddr.parse(address);
+
+    // Block private, loopback, and cloud metadata IPs
+    if (parsedIp.range() !== 'unicast' || address === '169.254.169.254') {
+      throw new Error('SSRF blocked: attempt to access private or metadata IP');
+    }
+
+    // Fetch with disabled auto-redirect to avoid redirect-based SSRF bypass
+    return axios.get(targetUrl, {
+      maxRedirects: 0,
+      timeout: 5000
+    });
+  }
+  ```
+
+---
+
+### LAYER 12: Object-Level Authorization & Race Condition Locking (Anti-IDOR & Concurrency)
+
+**Rule:** Never trust record IDs (`/api/orders/:id`, `/api/profile/:id`) supplied by users without verifying explicit ownership against the authenticated session user. Eliminate concurrency race conditions by using atomic database operations or row-level locking.
+
+- **Vulnerabilities Prevented:** Insecure Direct Object References (IDOR / BOLA), double-spend balance exploitation, voucher replay via parallel requests.
+- **A. Explicit Object-Level Authorization (Anti-IDOR):**
+  ```javascript
+  // VULNERABLE:
+  // const order = await db.get('SELECT * FROM orders WHERE id = ?', req.params.id);
+
+  // SECURE (Binding ownership directly into query):
+  app.get('/api/orders/:id', requireAuth, async (req, res) => {
+    const order = await db.get(
+      'SELECT * FROM orders WHERE id = ? AND user_id = ?',
+      [req.params.id, req.user.id] // MUST match authenticated user
+    );
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found or unauthorized' });
+    }
+    res.json(order);
+  });
+  ```
+- **B. Concurrency & Race Condition Defense (ACID Row-Locking / Atomic Decrement):**
+  ```javascript
+  // Prevent parallel double-spending using Atomic Conditional Updates
+  app.post('/api/balance/deduct', requireAuth, async (req, res) => {
+    const amount = Number(req.body.amount);
+    if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+    // Single atomic database operation guarantees thread safety
+    const result = await db.run(
+      'UPDATE users SET balance = balance - ? WHERE id = ? AND balance >= ?',
+      [amount, req.user.id, amount]
+    );
+
+    if (result.changes === 0) {
+      return res.status(400).json({ error: 'Insufficient funds or concurrent transaction' });
+    }
+
+    res.json({ success: true });
+  });
+  ```
+
+---
+
 ## AI Agent Verification Checklist (Run Before Ship)
 
-When your AI agent finishes hardening, demand proof against this checklist:
+When your AI agent finishes hardening, demand proof against this 12-point checklist:
 
 | # | Protection Check | Status | Verification Method |
 |---|---|---|---|
@@ -394,3 +536,6 @@ When your AI agent finishes hardening, demand proof against this checklist:
 | 7 | Internal endpoints protected by `X-Internal-Key` | [ ] | Request without header (expect 403) |
 | 8 | `x-powered-by` disabled & security headers active | [ ] | Inspect `curl -I` headers |
 | 9 | Webhooks verify HMAC via `timingSafeEqual` | [ ] | Code review payment/webhook endpoints |
+| 10 | File uploads validated via magic bytes & UUID names | [ ] | Test uploading a renamed `.php.jpg` shell |
+| 11 | Outbound fetches reject private IPs & metadata | [ ] | Test fetch with `http://127.0.0.1` and `169.254.169.254` |
+| 12 | Object endpoints verify `user_id` & atomic locks | [ ] | Verify query binds `session.user.id` and atomic updates |
