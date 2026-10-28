@@ -24,7 +24,7 @@ echo -e "${NC}"
 TARGET_DIR="$(pwd)"
 echo -e "${BLUE}[*] Target Project Directory:${NC} ${TARGET_DIR}"
 
-BASE_URL="https://raw.githubusercontent.com/ekaharefa/vibe-security-protocol/main"
+BASE_URL="https://raw.githubusercontent.com/recode-project/vibe-security-protocol/main"
 
 # Function to download or copy file
 install_file() {

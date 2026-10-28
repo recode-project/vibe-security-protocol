@@ -19,7 +19,7 @@
 Run this inside your project root directory:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/ekaharefa/vibe-security-protocol/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/recode-project/vibe-security-protocol/main/install.sh | bash
 ```
 
 ### Option 2: Clone or Copy Manually
